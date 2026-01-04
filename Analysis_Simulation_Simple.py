@@ -342,7 +342,7 @@ class StopperManager:
             if grid.in_bounds(nx, ny) and grid.is_alive(nx, ny):
                 neighbors.append((nx, ny, dx, dy))
         
-        # Wenn weniger als 2 Nachbarn → kann nicht 2 breit sein (nur 1 Nachbar = dünner Finger)
+        # Wenn 1 oder weniger Nachbarn → kann nicht 2 breit sein (nur 1 Nachbar = dünner Finger)
         if len(neighbors) <= 1:
             return False
         
