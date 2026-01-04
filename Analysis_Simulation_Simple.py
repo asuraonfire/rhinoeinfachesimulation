@@ -31,9 +31,9 @@ class Config:
     MAX_ITERATIONS = 80
     
     # Driver-Gewichte
-    WEIGHT_LIGHT = 3.0
-    WEIGHT_ATTRACTOR = 5.0
-    WEIGHT_CONNECTED = 3.0
+    WEIGHT_LIGHT = 8.0
+    WEIGHT_ATTRACTOR = 12.0
+    WEIGHT_CONNECTED = 6.0
     
     # Stopper-Einstellungen
     BOUNDARY_RADIUS = 18
@@ -277,37 +277,47 @@ class StopperManager:
         return distance <= self.config.BOUNDARY_RADIUS
     
     def _check_min_width(self, grid, x, y):
-        """Prüft Mindestbreite - STRENGER
-        
-        Eine Zelle ist nur erlaubt wenn sie NACH dem Platzieren
-        mindestens 2 Zellen breit ist in horizontaler ODER vertikaler Richtung.
-        
-        Zusätzlich: Prüfe ob die neue Zelle einen "dünnen Finger" erzeugen würde.
         """
-        # Temporär setzen um zu prüfen wie es aussehen würde
+        STRENGE Prüfung: Nach dem Platzieren muss die Zelle Teil einer 
+        mindestens 2 Zellen breiten Struktur sein.
+        
+        Prüft: Hat die neue Zelle einen direkten Nachbarn der PARALLEL 
+        zur Wachstumsrichtung liegt?
+        
+        Erlaubt:          Nicht erlaubt:
+        ■ ■               ■
+        ● ■               ●    (nur 1 breit)
+        
+        ■                 
+        ●                 ■ ● ■  (Mitte ist nur 1 breit vertikal UND horizontal)
+        ■
+        """
+        min_w = self.config.MIN_WIDTH  # = 2
+        
+        # Temporär setzen
         grid.set(x, y, 1)
         
-        # Horizontal zählen (inkl. neue Zelle)
+        # Horizontal zählen: Wie viele zusammenhängende Zellen in dieser Reihe?
         count_h = 1
-        # Links
+        # Links zählen
         cx = x - 1
         while cx >= 0 and grid.is_alive(cx, y):
             count_h += 1
             cx -= 1
-        # Rechts  
+        # Rechts zählen
         cx = x + 1
         while cx < grid.size and grid.is_alive(cx, y):
             count_h += 1
             cx += 1
         
-        # Vertikal zählen
+        # Vertikal zählen: Wie viele zusammenhängende Zellen in dieser Spalte?
         count_v = 1
-        # Oben
+        # Oben zählen
         cy = y - 1
         while cy >= 0 and grid.is_alive(x, cy):
             count_v += 1
             cy -= 1
-        # Unten
+        # Unten zählen
         cy = y + 1
         while cy < grid.size and grid.is_alive(x, cy):
             count_v += 1
@@ -316,72 +326,93 @@ class StopperManager:
         # Zurücksetzen
         grid.set(x, y, 0)
         
-        # STRENGE Prüfung: Mindestens eine Richtung muss >= MIN_WIDTH sein
-        if count_h >= self.config.MIN_WIDTH or count_v >= self.config.MIN_WIDTH:
+        # STRENG: Mindestens EINE Richtung muss >= min_w sein
+        # UND: Die Zelle muss einen direkten Nachbarn haben der diese Breite erfüllt
+        
+        if count_h >= min_w:
+            return True
+        if count_v >= min_w:
             return True
         
-        # ZUSÄTZLICH: Prüfe ob die Zelle an eine breite Struktur angrenzt
-        # Sammle alle Nachbarn
+        # Zusätzliche Prüfung: Hat die Zelle einen Nachbarn der selbst 2-breit ist?
+        # Prüfe ob ein Nachbar-PAAR existiert (2 Nachbarn die nebeneinander sind)
         neighbors = []
         for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
             nx, ny = x + dx, y + dy
             if grid.in_bounds(nx, ny) and grid.is_alive(nx, ny):
-                neighbors.append((nx, ny))
+                neighbors.append((nx, ny, dx, dy))
         
-        # Wenn nur 1 Nachbar: Das wäre ein dünner Finger - blockieren!
-        if len(neighbors) <= 1:
+        # Wenn weniger als 1 Nachbar → kann nicht 2 breit sein
+        if len(neighbors) < 1:
             return False
         
-        # Prüfe ob zwei Nachbarn nebeneinander sind (= breite Basis)
-        for i, (n1x, n1y) in enumerate(neighbors):
-            for (n2x, n2y) in neighbors[i+1:]:
-                # Nebeneinander = Manhattan-Distanz ist 1
-                if abs(n1x - n2x) + abs(n1y - n2y) == 1:
-                    return True  # Breite Basis vorhanden
+        # Prüfe für jeden Nachbarn ob er einen parallelen Nachbarn hat
+        for nx, ny, dx, dy in neighbors:
+            # Parallele Richtungen (senkrecht zur Verbindung)
+            if dx != 0:  # Nachbar ist horizontal
+                # Prüfe ob darüber oder darunter auch eine Zelle ist
+                if grid.is_alive(nx, ny - 1) or grid.is_alive(nx, ny + 1):
+                    return True
+                if grid.is_alive(x, y - 1) or grid.is_alive(x, y + 1):
+                    return True
+            else:  # Nachbar ist vertikal
+                # Prüfe ob links oder rechts auch eine Zelle ist
+                if grid.is_alive(nx - 1, ny) or grid.is_alive(nx + 1, ny):
+                    return True
+                if grid.is_alive(x - 1, y) or grid.is_alive(x + 1, y):
+                    return True
         
         return False
     
     def _check_light_distance(self, grid, x, y):
-        """Prüft Licht-Abstand (max. 3 Zellen vom Rand)
-        
-        Berechnet kürzeste Distanz zu einer leeren Zelle oder zum Grid-Rand.
         """
-        # Temporär setzen für Distanz-Berechnung
+        Prüft ob in mindestens EINER der 4 Richtungen (N/S/E/W)
+        nach max. X Zellen eine FREIE Zelle ist.
+        
+        Beispiel mit MAX_LIGHT_DISTANCE = 4:
+        - Schau nach Norden: Ist nach 1, 2, 3 oder 4 Zellen eine freie Zelle? 
+        - Schau nach Süden: Ist nach 1, 2, 3 oder 4 Zellen eine freie Zelle?
+        - Schau nach Osten: ...
+        - Schau nach Westen: ...
+        
+        Wenn MINDESTENS EINE Richtung innerhalb von 4 Zellen frei ist → erlaubt
+        Wenn ALLE 4 Richtungen nach 4 Zellen immer noch blockiert sind → blockiert
+        """
+        max_dist = self.config.MAX_LIGHT_DISTANCE  # z.B. 3 oder 4
+        
+        # Temporär setzen um zu prüfen wie es aussehen würde
         grid.set(x, y, 1)
         
-        # BFS um Distanz zur nächsten leeren Zelle zu finden
-        from collections import deque
+        # 4 Richtungen prüfen (von Neumann Nachbarschaft)
+        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
         
-        visited = set()
-        queue = deque([(x, y, 0)])
-        visited.add((x, y))
-        min_distance = 999
+        found_free = False
         
-        while queue:
-            cx, cy, dist = queue.popleft()
-            
-            # Rand des Grids zählt als "außen"
-            if cx == 0 or cx == grid.size - 1 or cy == 0 or cy == grid.size - 1:
-                min_distance = min(min_distance, dist)
-                break
-            
-            for nx, ny in grid.get_neighbors_4(cx, cy):
-                if (nx, ny) in visited:
-                    continue
+        for dx, dy in directions:
+            # In diese Richtung schauen
+            for dist in range(1, max_dist + 1):
+                check_x = x + (dx * dist)
+                check_y = y + (dy * dist)
                 
-                # Leere Zelle gefunden = Licht erreicht
-                if grid.is_empty(nx, ny):
-                    min_distance = dist + 1
-                    queue.clear()
+                # Außerhalb Grid = frei (Licht kommt von außen rein)
+                if not grid.in_bounds(check_x, check_y):
+                    found_free = True
                     break
                 
-                visited.add((nx, ny))
-                queue.append((nx, ny, dist + 1))
+                # Leere Zelle gefunden = Licht kommt durch
+                if grid.is_empty(check_x, check_y):
+                    found_free = True
+                    break
+                
+                # Belegte Zelle → weiter schauen in diese Richtung
+            
+            if found_free:
+                break
         
         # Zurücksetzen
         grid.set(x, y, 0)
         
-        return min_distance <= self.config.MAX_LIGHT_DISTANCE
+        return found_free
 
 
 # ============================================================================
@@ -692,7 +723,7 @@ class AnalysisSimulation:
             scored_candidates.sort(key=lambda item: item[1], reverse=True)
             
             # Gewichtete Zufallsauswahl aus Top-Kandidaten
-            top_count = min(5, len(scored_candidates))
+            top_count = min(3, len(scored_candidates))
             top_candidates = scored_candidates[:top_count]
             
             # Gewichte für Zufallsauswahl
