@@ -36,7 +36,7 @@ class Config:
     WEIGHT_CONNECTED = 6.0
     
     # Stopper-Einstellungen
-    BOUNDARY_RADIUS = 18
+    BOUNDARY_SIZE = 18  # Halbe Breite/Höhe des Rechtecks (also 36x36 Rechteck)
     MIN_WIDTH = 2
     MAX_LIGHT_DISTANCE = 3
     
@@ -269,99 +269,76 @@ class StopperManager:
         return True
     
     def _check_boundary(self, x, y, center_x, center_y):
-        """Prüft ob Zelle innerhalb der Boundary ist (Kreis mit Radius 18)"""
-        dx = x - center_x
-        dy = y - center_y
-        distance = math.sqrt(dx * dx + dy * dy)
+        """Prüft ob Zelle innerhalb der Boundary ist (RECHTECK)"""
+        dx = abs(x - center_x)
+        dy = abs(y - center_y)
         
-        return distance <= self.config.BOUNDARY_RADIUS
+        # Rechteck-Prüfung: Innerhalb von BOUNDARY_SIZE in beide Richtungen
+        return dx <= self.config.BOUNDARY_SIZE and dy <= self.config.BOUNDARY_SIZE
     
     def _check_min_width(self, grid, x, y):
         """
-        STRENGE Prüfung: Nach dem Platzieren muss die Zelle Teil einer 
-        mindestens 2 Zellen breiten Struktur sein.
+        STRENGE Prüfung: Die neue Zelle muss zusammen mit einem Nachbarn
+        eine Struktur bilden die mindestens 2 Zellen breit ist.
         
-        Prüft: Hat die neue Zelle einen direkten Nachbarn der PARALLEL 
-        zur Wachstumsrichtung liegt?
+        Erlaubt (2 breit horizontal):     Erlaubt (2 breit vertikal):
+        ■ ●                               ■
+                                          ●
         
-        Erlaubt:          Nicht erlaubt:
-        ■ ■               ■
-        ● ■               ●    (nur 1 breit)
-        
-        ■                 
-        ●                 ■ ● ■  (Mitte ist nur 1 breit vertikal UND horizontal)
+        NICHT erlaubt (nur 1 breit):
         ■
+        ●
+        ■
+        (Hier ist ● nur 1 breit weil links/rechts nichts ist)
         """
-        min_w = self.config.MIN_WIDTH  # = 2
         
-        # Temporär setzen
-        grid.set(x, y, 1)
+        # Prüfe: Hat die Zelle einen Nachbarn UND hat dieser Nachbar 
+        # oder die Zelle selbst einen parallelen Nachbarn?
         
-        # Horizontal zählen: Wie viele zusammenhängende Zellen in dieser Reihe?
-        count_h = 1
-        # Links zählen
-        cx = x - 1
-        while cx >= 0 and grid.is_alive(cx, y):
-            count_h += 1
-            cx -= 1
-        # Rechts zählen
-        cx = x + 1
-        while cx < grid.size and grid.is_alive(cx, y):
-            count_h += 1
-            cx += 1
+        # Horizontale Nachbarn prüfen
+        has_left = grid.is_alive(x - 1, y)
+        has_right = grid.is_alive(x + 1, y)
         
-        # Vertikal zählen: Wie viele zusammenhängende Zellen in dieser Spalte?
-        count_v = 1
-        # Oben zählen
-        cy = y - 1
-        while cy >= 0 and grid.is_alive(x, cy):
-            count_v += 1
-            cy -= 1
-        # Unten zählen
-        cy = y + 1
-        while cy < grid.size and grid.is_alive(x, cy):
-            count_v += 1
-            cy += 1
+        # Vertikale Nachbarn prüfen  
+        has_up = grid.is_alive(x, y - 1)
+        has_down = grid.is_alive(x, y + 1)
         
-        # Zurücksetzen
-        grid.set(x, y, 0)
-        
-        # STRENG: Mindestens EINE Richtung muss >= min_w sein
-        # UND: Die Zelle muss einen direkten Nachbarn haben der diese Breite erfüllt
-        
-        if count_h >= min_w:
-            return True
-        if count_v >= min_w:
-            return True
-        
-        # Zusätzliche Prüfung: Hat die Zelle einen Nachbarn der selbst 2-breit ist?
-        # Prüfe ob ein Nachbar-PAAR existiert (2 Nachbarn die nebeneinander sind)
-        neighbors = []
-        for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-            nx, ny = x + dx, y + dy
-            if grid.in_bounds(nx, ny) and grid.is_alive(nx, ny):
-                neighbors.append((nx, ny, dx, dy))
-        
-        # Wenn 1 oder weniger Nachbarn → kann nicht 2 breit sein (nur 1 Nachbar = dünner Finger)
-        if len(neighbors) <= 1:
-            return False
-        
-        # Prüfe für jeden Nachbarn ob er einen parallelen Nachbarn hat
-        for nx, ny, dx, dy in neighbors:
-            # Parallele Richtungen (senkrecht zur Verbindung)
-            if dx != 0:  # Nachbar ist horizontal
-                # Prüfe ob darüber oder darunter auch eine Zelle ist
-                if grid.is_alive(nx, ny - 1) or grid.is_alive(nx, ny + 1):
+        # Fall 1: Horizontal 2 breit - links ODER rechts ist belegt
+        if has_left or has_right:
+            # Prüfe ob diese horizontale Verbindung "breit" ist
+            # D.h. die Zelle oder der Nachbar hat noch einen parallelen Nachbarn
+            
+            if has_left:
+                # Ist links-oben oder links-unten auch belegt? Oder oben/unten von mir?
+                if grid.is_alive(x - 1, y - 1) or grid.is_alive(x - 1, y + 1):
                     return True
-                if grid.is_alive(x, y - 1) or grid.is_alive(x, y + 1):
+                if has_up or has_down:
                     return True
-            else:  # Nachbar ist vertikal
-                # Prüfe ob links oder rechts auch eine Zelle ist
-                if grid.is_alive(nx - 1, ny) or grid.is_alive(nx + 1, ny):
+            
+            if has_right:
+                # Ist rechts-oben oder rechts-unten auch belegt? Oder oben/unten von mir?
+                if grid.is_alive(x + 1, y - 1) or grid.is_alive(x + 1, y + 1):
                     return True
-                if grid.is_alive(x - 1, y) or grid.is_alive(x + 1, y):
+                if has_up or has_down:
                     return True
         
+        # Fall 2: Vertikal 2 breit - oben ODER unten ist belegt
+        if has_up or has_down:
+            if has_up:
+                # Ist oben-links oder oben-rechts auch belegt? Oder links/rechts von mir?
+                if grid.is_alive(x - 1, y - 1) or grid.is_alive(x + 1, y - 1):
+                    return True
+                if has_left or has_right:
+                    return True
+            
+            if has_down:
+                # Ist unten-links oder unten-rechts auch belegt? Oder links/rechts von mir?
+                if grid.is_alive(x - 1, y + 1) or grid.is_alive(x + 1, y + 1):
+                    return True
+                if has_left or has_right:
+                    return True
+        
+        # Keine 2-breite Struktur möglich
         return False
     
     def _check_light_distance(self, grid, x, y):
@@ -475,11 +452,11 @@ class Visualizer:
             if marker:
                 self.boxes.append(marker)
         
-        # Boundary-Kreis (wenn aktiv)
+        # Boundary-Rechteck (wenn aktiv)
         if show_boundary:
-            circle = self._make_boundary_circle(start_x, start_y)
-            if circle:
-                self.boxes.append(circle)
+            rectangle = self._make_boundary_rectangle(start_x, start_y)
+            if rectangle:
+                self.boxes.append(rectangle)
         
         rs.EnableRedraw(True)
     
@@ -530,18 +507,32 @@ class Visualizer:
         
         return None
     
-    def _make_boundary_circle(self, center_x, center_y):
-        """Erstellt einen Kreis für die Boundary"""
+    def _make_boundary_rectangle(self, center_x, center_y):
+        """Erstellt ein Rechteck für die Boundary"""
         cell = self.config.CELL_SIZE
-        radius = self.config.BOUNDARY_RADIUS * cell
-        center = (center_x * cell + cell / 2.0, center_y * cell + cell / 2.0, 0)
+        size = self.config.BOUNDARY_SIZE
+        
+        # Ecken des Rechtecks berechnen
+        x_min = (center_x - size) * cell
+        x_max = (center_x + size + 1) * cell
+        y_min = (center_y - size) * cell
+        y_max = (center_y + size + 1) * cell
+        
+        # Rechteck als Polyline zeichnen
+        points = [
+            (x_min, y_min, 0),
+            (x_max, y_min, 0),
+            (x_max, y_max, 0),
+            (x_min, y_max, 0),
+            (x_min, y_min, 0)  # Schließen
+        ]
         
         try:
-            circle = rs.AddCircle(center, radius)
-            if circle:
-                rs.ObjectColor(circle, self.config.COLOR_BOUNDARY)
-                rs.ObjectLayer(circle, self.layer_name)
-                return circle
+            rect = rs.AddPolyline(points)
+            if rect:
+                rs.ObjectColor(rect, self.config.COLOR_BOUNDARY)
+                rs.ObjectLayer(rect, self.layer_name)
+                return rect
         except:
             pass
         
@@ -646,7 +637,7 @@ class AnalysisSimulation:
     def _select_stoppers(self):
         """Interaktive Auswahl der Stopper"""
         print("\n=== STOPPER AUSWAHL ===")
-        print("1 = boundary (Grundstücksgrenze: Kreis mit Radius 18 um Mitte)")
+        print("1 = boundary (Grundstücksgrenze: Rechteck 36x36 um Mitte)")
         print("2 = min_width (Mindestbreite: Mind. 2 Zellen breit)")
         print("3 = light_distance (Licht-Abstand: Max. 3 Zellen vom Rand)")
         print("Eingabe z.B. '1,3' für Stopper 1 und 3, 'A' für alle, 'N' für keine")
