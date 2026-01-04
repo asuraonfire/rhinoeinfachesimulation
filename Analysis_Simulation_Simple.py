@@ -49,9 +49,6 @@ class Config:
     COLOR_START = (255, 215, 0)     # Gold
     COLOR_ATTRACTOR = (255, 0, 0)   # Rot
     COLOR_BOUNDARY = (0, 0, 255)    # Blau
-    
-    # Wachstum
-    MAX_ATTEMPTS = 1000
 
 
 # ============================================================================
@@ -168,7 +165,7 @@ class DriverManager:
             light_score = self._calculate_light_score(x, y)
             score += light_score * self.config.WEIGHT_LIGHT
         
-        # Driver 2: attractor - Growth Point bei (12, 12)
+        # Driver 2: attractor - Growth Point bei (40, 40)
         if self.drivers['attractor']:
             attractor_score = self._calculate_attractor_score(x, y)
             score += attractor_score * self.config.WEIGHT_ATTRACTOR
@@ -193,7 +190,7 @@ class DriverManager:
         return (dist_x + dist_y) / 2.0
     
     def _calculate_attractor_score(self, x, y):
-        """Berechnet Attractor-Score (Nähe zu Growth Point bei (12, 12))"""
+        """Berechnet Attractor-Score (Nähe zu Growth Point bei (40, 40))"""
         dx = x - self.config.ATTRACTOR_X
         dy = y - self.config.ATTRACTOR_Y
         distance = math.sqrt(dx * dx + dy * dy)
