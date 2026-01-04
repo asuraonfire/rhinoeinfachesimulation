@@ -342,8 +342,8 @@ class StopperManager:
             if grid.in_bounds(nx, ny) and grid.is_alive(nx, ny):
                 neighbors.append((nx, ny, dx, dy))
         
-        # Wenn weniger als 1 Nachbar → kann nicht 2 breit sein
-        if len(neighbors) < 1:
+        # Wenn weniger als 2 Nachbarn → kann nicht 2 breit sein (nur 1 Nachbar = dünner Finger)
+        if len(neighbors) <= 1:
             return False
         
         # Prüfe für jeden Nachbarn ob er einen parallelen Nachbarn hat
@@ -369,14 +369,14 @@ class StopperManager:
         Prüft ob in mindestens EINER der 4 Richtungen (N/S/E/W)
         nach max. X Zellen eine FREIE Zelle ist.
         
-        Beispiel mit MAX_LIGHT_DISTANCE = 4:
-        - Schau nach Norden: Ist nach 1, 2, 3 oder 4 Zellen eine freie Zelle? 
-        - Schau nach Süden: Ist nach 1, 2, 3 oder 4 Zellen eine freie Zelle?
+        Beispiel mit MAX_LIGHT_DISTANCE = 3:
+        - Schau nach Norden: Ist nach 1, 2, oder 3 Zellen eine freie Zelle? 
+        - Schau nach Süden: Ist nach 1, 2, oder 3 Zellen eine freie Zelle?
         - Schau nach Osten: ...
         - Schau nach Westen: ...
         
-        Wenn MINDESTENS EINE Richtung innerhalb von 4 Zellen frei ist → erlaubt
-        Wenn ALLE 4 Richtungen nach 4 Zellen immer noch blockiert sind → blockiert
+        Wenn MINDESTENS EINE Richtung innerhalb von 3 Zellen frei ist → erlaubt
+        Wenn ALLE 4 Richtungen nach 3 Zellen immer noch blockiert sind → blockiert
         """
         max_dist = self.config.MAX_LIGHT_DISTANCE  # z.B. 3 oder 4
         
