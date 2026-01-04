@@ -321,25 +321,22 @@ class StopperManager:
             return True
         
         # ZUSÄTZLICH: Prüfe ob die Zelle an eine breite Struktur angrenzt
-        # Zähle wie viele Nachbarn die neue Zelle hätte
-        neighbor_count = grid.count_alive_neighbors(x, y)
-        
-        # Wenn nur 1 Nachbar: Das wäre ein dünner Finger - blockieren!
-        if neighbor_count <= 1:
-            return False
-        
-        # Prüfe ob mindestens ein Nachbar-Paar nebeneinander liegt (= breite Basis)
+        # Sammle alle Nachbarn
         neighbors = []
         for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
             nx, ny = x + dx, y + dy
             if grid.in_bounds(nx, ny) and grid.is_alive(nx, ny):
                 neighbors.append((nx, ny))
         
-        # Prüfe ob zwei Nachbarn nebeneinander sind
+        # Wenn nur 1 Nachbar: Das wäre ein dünner Finger - blockieren!
+        if len(neighbors) <= 1:
+            return False
+        
+        # Prüfe ob zwei Nachbarn nebeneinander sind (= breite Basis)
         for i, (n1x, n1y) in enumerate(neighbors):
             for (n2x, n2y) in neighbors[i+1:]:
-                # Nebeneinander = Differenz ist 1 in einer Achse, 0 in der anderen
-                if abs(n1x - n2x) + abs(n1y - n2y) <= 2:
+                # Nebeneinander = Manhattan-Distanz ist 1
+                if abs(n1x - n2x) + abs(n1y - n2y) == 1:
                     return True  # Breite Basis vorhanden
         
         return False
