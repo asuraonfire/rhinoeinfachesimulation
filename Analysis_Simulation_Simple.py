@@ -28,7 +28,7 @@ class Config:
     CELL_SIZE = 3.0
     START_X = 25
     START_Y = 25
-    MAX_ITERATIONS = 200
+    MAX_ITERATIONS = 80
     
     # Driver-Gewichte
     WEIGHT_LIGHT = 3.0
@@ -277,19 +277,24 @@ class StopperManager:
         return distance <= self.config.BOUNDARY_RADIUS
     
     def _check_min_width(self, grid, x, y):
-        """Prüft Mindestbreite (mind. 2 Zellen breit)
+        """Prüft Mindestbreite - STRENGER
         
-        Zählt Breite in horizontaler und vertikaler Richtung.
-        Mindestens eine Richtung muss >= MIN_WIDTH sein.
+        Eine Zelle ist nur erlaubt wenn sie NACH dem Platzieren
+        mindestens 2 Zellen breit ist in horizontaler ODER vertikaler Richtung.
+        
+        Zusätzlich: Prüfe ob die neue Zelle einen "dünnen Finger" erzeugen würde.
         """
-        # Horizontal zählen (inkl. Kandidat)
+        # Temporär setzen um zu prüfen wie es aussehen würde
+        grid.set(x, y, 1)
+        
+        # Horizontal zählen (inkl. neue Zelle)
         count_h = 1
         # Links
         cx = x - 1
         while cx >= 0 and grid.is_alive(cx, y):
             count_h += 1
             cx -= 1
-        # Rechts
+        # Rechts  
         cx = x + 1
         while cx < grid.size and grid.is_alive(cx, y):
             count_h += 1
@@ -308,8 +313,33 @@ class StopperManager:
             count_v += 1
             cy += 1
         
-        # Mindestens eine Richtung muss >= MIN_WIDTH sein
-        return count_h >= self.config.MIN_WIDTH or count_v >= self.config.MIN_WIDTH
+        # Zurücksetzen
+        grid.set(x, y, 0)
+        
+        # STRENGE Prüfung: Mindestens eine Richtung muss >= MIN_WIDTH sein
+        if count_h >= self.config.MIN_WIDTH or count_v >= self.config.MIN_WIDTH:
+            return True
+        
+        # ZUSÄTZLICH: Prüfe ob die Zelle an eine breite Struktur angrenzt
+        # Sammle alle Nachbarn
+        neighbors = []
+        for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+            nx, ny = x + dx, y + dy
+            if grid.in_bounds(nx, ny) and grid.is_alive(nx, ny):
+                neighbors.append((nx, ny))
+        
+        # Wenn nur 1 Nachbar: Das wäre ein dünner Finger - blockieren!
+        if len(neighbors) <= 1:
+            return False
+        
+        # Prüfe ob zwei Nachbarn nebeneinander sind (= breite Basis)
+        for i, (n1x, n1y) in enumerate(neighbors):
+            for (n2x, n2y) in neighbors[i+1:]:
+                # Nebeneinander = Manhattan-Distanz ist 1
+                if abs(n1x - n2x) + abs(n1y - n2y) == 1:
+                    return True  # Breite Basis vorhanden
+        
+        return False
     
     def _check_light_distance(self, grid, x, y):
         """Prüft Licht-Abstand (max. 3 Zellen vom Rand)
