@@ -3,7 +3,7 @@
 Analysis Simulation Simple - Vereinfachte modulare Simulation
 ==============================================================
 Ein einfaches Grid-basiertes Wachstumssimulationssystem mit:
-- 15×15 Grid
+- 50×50 Grid
 - 3 Driver (Wachstumsförderer)
 - 3 Stopper (Wachstumsbegrenzer)
 - Interaktive Auswahl
@@ -24,42 +24,39 @@ class Config:
     """Zentrale Konfiguration für die Simulation"""
     
     # Grid-Einstellungen
-    GRID_SIZE = 15
+    GRID_SIZE = 50
     CELL_SIZE = 3.0
-    START_X = 7
-    START_Y = 7
-    MAX_CELLS = 50
+    START_X = 25
+    START_Y = 25
+    MAX_ITERATIONS = 200
     
     # Driver-Gewichte
-    WEIGHT_LIGHT = 1.0
-    WEIGHT_ATTRACTOR = 2.0
-    WEIGHT_CONNECTED = 1.5
+    WEIGHT_LIGHT = 3.0
+    WEIGHT_ATTRACTOR = 5.0
+    WEIGHT_CONNECTED = 3.0
     
     # Stopper-Einstellungen
-    BOUNDARY_RADIUS = 6
+    BOUNDARY_RADIUS = 18
     MIN_WIDTH = 2
     MAX_LIGHT_DISTANCE = 3
     
     # Growth Point
-    ATTRACTOR_X = 12
-    ATTRACTOR_Y = 12
+    ATTRACTOR_X = 40
+    ATTRACTOR_Y = 40
     
     # Farben (RGB)
     COLOR_NORMAL = (0, 255, 0)      # Grün
     COLOR_START = (255, 215, 0)     # Gold
     COLOR_ATTRACTOR = (255, 0, 0)   # Rot
     COLOR_BOUNDARY = (0, 0, 255)    # Blau
-    
-    # Wachstum
-    MAX_ATTEMPTS = 1000
 
 
 # ============================================================================
-# SIMPLEGRID - 15×15 Grid-Verwaltung
+# SIMPLEGRID - 50×50 Grid-Verwaltung
 # ============================================================================
 
 class SimpleGrid:
-    """Verwaltet ein 15×15 Grid von Zellen"""
+    """Verwaltet ein 50×50 Grid von Zellen"""
     
     def __init__(self, size):
         self.size = size
@@ -168,7 +165,7 @@ class DriverManager:
             light_score = self._calculate_light_score(x, y)
             score += light_score * self.config.WEIGHT_LIGHT
         
-        # Driver 2: attractor - Growth Point bei (12, 12)
+        # Driver 2: attractor - Growth Point bei (40, 40)
         if self.drivers['attractor']:
             attractor_score = self._calculate_attractor_score(x, y)
             score += attractor_score * self.config.WEIGHT_ATTRACTOR
@@ -193,7 +190,7 @@ class DriverManager:
         return (dist_x + dist_y) / 2.0
     
     def _calculate_attractor_score(self, x, y):
-        """Berechnet Attractor-Score (Nähe zu Growth Point bei (12, 12))"""
+        """Berechnet Attractor-Score (Nähe zu Growth Point bei (40, 40))"""
         dx = x - self.config.ATTRACTOR_X
         dy = y - self.config.ATTRACTOR_Y
         distance = math.sqrt(dx * dx + dy * dy)
@@ -272,7 +269,7 @@ class StopperManager:
         return True
     
     def _check_boundary(self, x, y, center_x, center_y):
-        """Prüft ob Zelle innerhalb der Boundary ist (Kreis mit Radius 6)"""
+        """Prüft ob Zelle innerhalb der Boundary ist (Kreis mit Radius 18)"""
         dx = x - center_x
         dy = y - center_y
         distance = math.sqrt(dx * dx + dy * dy)
@@ -575,7 +572,7 @@ class AnalysisSimulation:
         """Interaktive Auswahl der Driver"""
         print("\n=== DRIVER AUSWAHL ===")
         print("1 = light (Licht-Score: Wachstum Richtung Süd-Ost)")
-        print("2 = attractor (Growth Point bei (12, 12): Wachstum zum Hotspot)")
+        print("2 = attractor (Growth Point bei (40, 40): Wachstum zum Hotspot)")
         print("3 = connected (Verbindungs-Bonus: Kompakte, runde Formen)")
         print("Eingabe z.B. '1,2' für Driver 1 und 2, 'A' für alle, 'N' für keine")
         
@@ -588,7 +585,7 @@ class AnalysisSimulation:
     def _select_stoppers(self):
         """Interaktive Auswahl der Stopper"""
         print("\n=== STOPPER AUSWAHL ===")
-        print("1 = boundary (Grundstücksgrenze: Kreis mit Radius 6 um Mitte)")
+        print("1 = boundary (Grundstücksgrenze: Kreis mit Radius 18 um Mitte)")
         print("2 = min_width (Mindestbreite: Mind. 2 Zellen breit)")
         print("3 = light_distance (Licht-Abstand: Max. 3 Zellen vom Rand)")
         print("Eingabe z.B. '1,3' für Stopper 1 und 3, 'A' für alle, 'N' für keine")
@@ -632,13 +629,13 @@ class AnalysisSimulation:
         return selected
     
     def _run_growth(self):
-        """Führt das Wachstum aus bis max. 50 Zellen erreicht sind"""
+        """Führt das Wachstum aus bis MAX_ITERATIONS erreicht sind oder keine Kandidaten mehr vorhanden"""
         start_x = self.config.START_X
         start_y = self.config.START_Y
         
-        attempts = 0
+        iterations = 0
         
-        while self.grid.count_alive() < self.config.MAX_CELLS and attempts < self.config.MAX_ATTEMPTS:
+        while iterations < self.config.MAX_ITERATIONS:
             # Finde Frontier-Zellen (leere Zellen die an belegte angrenzen)
             frontier = self.grid.get_frontier_cells()
             
@@ -658,8 +655,8 @@ class AnalysisSimulation:
                 scored_candidates.append(((x, y), score))
             
             if not scored_candidates:
-                attempts += 1
-                continue
+                print("Keine gültigen Kandidaten mehr (alle von Stoppern blockiert)")
+                break
             
             # Sortiere nach Score (höchster zuerst)
             scored_candidates.sort(key=lambda item: item[1], reverse=True)
@@ -691,10 +688,10 @@ class AnalysisSimulation:
             
             # Zelle setzen
             self.grid.set(chosen[0], chosen[1], 1)
-            attempts = 0  # Reset bei Erfolg
+            iterations += 1
         
         final_count = self.grid.count_alive()
-        print("Wachstum beendet mit {} Zellen".format(final_count))
+        print("Wachstum beendet mit {} Zellen nach {} Iterationen".format(final_count, iterations))
 
 
 # ============================================================================
