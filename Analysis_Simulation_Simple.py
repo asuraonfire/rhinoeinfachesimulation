@@ -559,7 +559,7 @@ class AnalysisSimulation:
             
             # Nochmal?
             result = rs.MessageBox(
-                "Nochmal eine Simulation durchfuehren?",
+                "Nochmal eine Simulation durchführen?",
                 4 | 32,
                 "Nochmal?"
             )
@@ -574,12 +574,12 @@ class AnalysisSimulation:
     def _select_drivers(self):
         """Interaktive Auswahl der Driver"""
         print("\n=== DRIVER AUSWAHL ===")
-        print("1 = light (Licht-Score: Wachstum Richtung Sued-Ost)")
+        print("1 = light (Licht-Score: Wachstum Richtung Süd-Ost)")
         print("2 = attractor (Growth Point bei (12, 12): Wachstum zum Hotspot)")
         print("3 = connected (Verbindungs-Bonus: Kompakte, runde Formen)")
-        print("Eingabe z.B. '1,2' fuer Driver 1 und 2, 'A' fuer alle, 'N' fuer keine")
+        print("Eingabe z.B. '1,2' für Driver 1 und 2, 'A' für alle, 'N' für keine")
         
-        input_str = rs.GetString("Driver auswaehlen", "A")
+        input_str = rs.GetString("Driver auswählen", "A")
         if not input_str:
             input_str = "A"
         
@@ -588,12 +588,12 @@ class AnalysisSimulation:
     def _select_stoppers(self):
         """Interaktive Auswahl der Stopper"""
         print("\n=== STOPPER AUSWAHL ===")
-        print("1 = boundary (Grundstuecksgrenze: Kreis mit Radius 6 um Mitte)")
+        print("1 = boundary (Grundstücksgrenze: Kreis mit Radius 6 um Mitte)")
         print("2 = min_width (Mindestbreite: Mind. 2 Zellen breit)")
         print("3 = light_distance (Licht-Abstand: Max. 3 Zellen vom Rand)")
-        print("Eingabe z.B. '1,3' fuer Stopper 1 und 3, 'A' fuer alle, 'N' fuer keine")
+        print("Eingabe z.B. '1,3' für Stopper 1 und 3, 'A' für alle, 'N' für keine")
         
-        input_str = rs.GetString("Stopper auswaehlen", "A")
+        input_str = rs.GetString("Stopper auswählen", "A")
         if not input_str:
             input_str = "A"
         
@@ -643,7 +643,7 @@ class AnalysisSimulation:
             frontier = self.grid.get_frontier_cells()
             
             if not frontier:
-                print("Keine Frontier-Zellen mehr verfuegbar")
+                print("Keine Frontier-Zellen mehr verfügbar")
                 break
             
             # Score alle Kandidaten
