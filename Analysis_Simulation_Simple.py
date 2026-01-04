@@ -44,6 +44,11 @@ class Config:
     ATTRACTOR_X = 40
     ATTRACTOR_Y = 40
     
+    # Multi-Cell Growth Einstellungen
+    CELLS_PER_ITERATION_MIN = 3    # Mindestens 3 neue Zellen pro Iteration
+    CELLS_PER_ITERATION_MAX = 5    # Maximal 5 neue Zellen pro Iteration
+    TOP_CANDIDATES_POOL = 10       # Pool der besten Kandidaten für Auswahl
+    
     # Farben (RGB)
     COLOR_NORMAL = (0, 255, 0)      # Grün
     COLOR_START = (255, 215, 0)     # Gold
@@ -713,33 +718,47 @@ class AnalysisSimulation:
             # Sortiere nach Score (höchster zuerst)
             scored_candidates.sort(key=lambda item: item[1], reverse=True)
             
-            # Gewichtete Zufallsauswahl aus Top-Kandidaten
-            top_count = min(3, len(scored_candidates))
+            # Top-10 Kandidaten für Auswahl
+            top_count = min(self.config.TOP_CANDIDATES_POOL, len(scored_candidates))
             top_candidates = scored_candidates[:top_count]
             
-            # Gewichte für Zufallsauswahl
-            weights = []
-            for (pos, score) in top_candidates:
-                # Exponentieller Bonus für höhere Scores
-                weight = math.exp(score)
-                weights.append(weight)
+            # Zufällige Anzahl: 3 bis 5 (oder weniger wenn nicht genug Kandidaten)
+            max_cells = min(self.config.CELLS_PER_ITERATION_MAX, len(top_candidates))
+            min_cells = min(self.config.CELLS_PER_ITERATION_MIN, max_cells)
+            cells_to_grow = random.randint(min_cells, max_cells)
             
-            # Gewichtete Auswahl
-            total_weight = sum(weights)
-            if total_weight <= 0:
-                chosen = top_candidates[0][0]
-            else:
-                r = random.random() * total_weight
-                cumulative = 0
-                chosen = top_candidates[0][0]
-                for i, w in enumerate(weights):
-                    cumulative += w
-                    if r <= cumulative:
-                        chosen = top_candidates[i][0]
-                        break
+            # Gewichtete Auswahl OHNE Zurücklegen (keine Duplikate)
+            available_candidates = list(top_candidates)  # Kopie für Entfernung
             
-            # Zelle setzen
-            self.grid.set(chosen[0], chosen[1], 1)
+            for _ in range(cells_to_grow):
+                if not available_candidates:
+                    break
+                
+                # Gewichte berechnen
+                weights = [math.exp(score) for (pos, score) in available_candidates]
+                total_weight = sum(weights)
+                
+                if total_weight <= 0:
+                    # Fallback: erste verfügbare Zelle
+                    chosen_idx = 0
+                else:
+                    # Gewichtete Zufallsauswahl
+                    r = random.random() * total_weight
+                    cumulative = 0
+                    chosen_idx = 0
+                    for i, w in enumerate(weights):
+                        cumulative += w
+                        if r <= cumulative:
+                            chosen_idx = i
+                            break
+                
+                # Zelle setzen
+                chosen_pos = available_candidates[chosen_idx][0]
+                self.grid.set(chosen_pos[0], chosen_pos[1], 1)
+                
+                # Aus Pool entfernen (keine Duplikate)
+                available_candidates.pop(chosen_idx)
+            
             iterations += 1
         
         final_count = self.grid.count_alive()
