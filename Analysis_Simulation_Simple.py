@@ -283,6 +283,11 @@ class StopperManager:
     
     def _check_min_width(self, grid, x, y):
         """
+        Prüfung für Mindestbreite von 2 Zellen.
+        
+        BOOTSTRAP-PHASE: Bei weniger als 4 Zellen wird Wachstum erlaubt,
+        um eine 2×2 Basis zu bilden. Danach greift die normale Prüfung.
+        
         STRENGE Prüfung: Die neue Zelle muss zusammen mit einem Nachbarn
         eine Struktur bilden die mindestens 2 Zellen breit ist.
         
@@ -297,6 +302,13 @@ class StopperManager:
         (Hier ist ● nur 1 breit weil links/rechts nichts ist)
         """
         
+        # Bootstrap-Phase: Erlaube Wachstum bis 4 Zellen existieren
+        # Damit kann sich eine 2×2 Basis bilden
+        alive_count = grid.count_alive()
+        if alive_count < 4:
+            return True  # Erlaube Wachstum während Bootstrap
+        
+        # Ab hier: Normale Mindestbreiten-Prüfung
         # Prüfe: Hat die Zelle einen Nachbarn UND hat dieser Nachbar 
         # oder die Zelle selbst einen parallelen Nachbarn?
         
